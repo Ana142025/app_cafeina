@@ -1,97 +1,78 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime
 
-st.set_page_config(page_title="📊 Consumo de Cafeína", page_icon="☕", layout="centered")
+# -----------------------------
+# Inicialização do "banco de dados" na sessão
+# -----------------------------
+if "dados" not in st.session_state:
+    st.session_state.dados = pd.DataFrame(columns=["ID", "Data", "Bebida", "Cafeina_mg", "Horas_de_Sono"])
 
-# ---------------------------
-# Catálogo de bebidas (mg por porção padrão)
-# ---------------------------
-catalogo = {
-    "Café coado (200 ml)": 95,
-    "Expresso (50 ml)": 65,
-    "Chá preto (200 ml)": 40,
-    "Chá verde (200 ml)": 30,
-    "Energético (250 ml)": 80,
-    "Refrigerante cola (350 ml)": 40,
-    "Achocolatado (200 ml)": 10,
-    "Pré-treino (1 dose)": 150
-}
+st.set_page_config(page_title="App Cafeína & Sono", layout="centered")
 
-# ---------------------------
-# Funções auxiliares
-# ---------------------------
-def calcular_janela(ultimo_consumo, hora_dormir):
-    if ultimo_consumo and hora_dormir:
-        return (hora_dormir - ultimo_consumo).seconds / 3600
-    return None
+st.title("☕ Monitor de Cafeína & Sono 😴")
 
-def semaforo(janela_horas):
-    if janela_horas is None:
-        return "⚪ Sem dados"
-    elif janela_horas > 9:
-        return "🟢 Verde (seguro)"
-    elif janela_horas > 6:
-        return "🟡 Amarelo (atenção)"
-    else:
-        return "🔴 Vermelho (risco para o sono)"
+# -----------------------------
+# Entradas do usuário
+# -----------------------------
+st.subheader("Registro de Consumo")
 
-# ---------------------------
-# Entrada de dados
-# ---------------------------
-st.title("☕ Análise do Consumo de Cafeína e Sono")
+id_usuario = st.text_input("Digite seu ID (pode ser nome ou número)")
+bebida = st.selectbox("Selecione a bebida:", ["Café", "Chá", "Refrigerante", "Energético", "Outros"])
+cafeina = st.number_input("Quantidade estimada de cafeína (mg):", min_value=0, max_value=500, step=10)
+horas_sono = st.number_input("Quantas horas você dormiu na última noite?", min_value=0.0, max_value=24.0, step=0.5)
+data = datetime.today().strftime("%d/%m/%Y")
 
-st.subheader("📌 Dados do dia")
-data = st.date_input("Data", datetime.today())
-hora_dormir = st.time_input("⏰ Hora prevista de dormir", value=datetime.strptime("23:00", "%H:%M").time())
-
-st.subheader("🥤 Registre suas bebidas")
-bebida = st.selectbox("Escolha a bebida:", list(catalogo.keys()))
-hora_consumo = st.time_input("Horário do consumo")
-quantidade = st.number_input("Quantas porções?", min_value=1, value=1)
-
-if "registros" not in st.session_state:
-    st.session_state["registros"] = []
-
-if st.button("➕ Adicionar consumo"):
-    mg = catalogo[bebida] * quantidade
-    st.session_state["registros"].append({
-        "Data": data,
-        "Bebida": bebida,
-        "Porções": quantidade,
-        "Hora_consumo": hora_consumo,
-        "Mg_cafeina": mg
+if st.button("Adicionar Registro"):
+    novo = pd.DataFrame({
+        "ID": [id_usuario],
+        "Data": [data],
+        "Bebida": [bebida],
+        "Cafeina_mg": [cafeina],
+        "Horas_de_Sono": [horas_sono]
     })
-    st.success(f"Adicionado: {bebida} ({mg} mg) às {hora_consumo}")
+    st.session_state.dados = pd.concat([st.session_state.dados, novo], ignore_index=True)
+    st.success("✅ Registro adicionado com sucesso!")
 
-# ---------------------------
-# Exibir registros do dia
-# ---------------------------
-df = pd.DataFrame(st.session_state["registros"])
-if not df.empty:
-    st.subheader("📋 Consumos registrados")
-    st.dataframe(df)
+# -----------------------------
+# Exibição da tabela
+# -----------------------------
+st.subheader("📋 Seus Registros")
+st.dataframe(st.session_state.dados)
 
-    # Último consumo do dia
-    ultimo = df["Hora_consumo"].max()
-    hora_dormir_dt = datetime.combine(data, hora_dormir)
-    ultimo_dt = datetime.combine(data, ultimo)
-    janela = calcular_janela(ultimo_dt, hora_dormir_dt)
-
-    st.subheader("🚦 Semáforo do Sono")
-    st.write(f"Último consumo às **{ultimo.strftime('%H:%M')}** → Janela até dormir: **{janela:.1f} h**")
-    st.markdown(f"### {semaforo(janela)}")
-
-    # Total de cafeína
-    total = df["Mg_cafeina"].sum()
-    st.metric("☕ Total de cafeína no dia (mg)", total)
-
-    # Gráfico
-    st.bar_chart(df.groupby("Bebida")["Mg_cafeina"].sum())
-
-    # Exportar CSV
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Baixar dados (CSV)", csv, "dados_cafeina.csv", "text/csv")
-
+# -----------------------------
+# Semáforo da qualidade do sono
+# -----------------------------
+st.subheader("🚦 Indicador de Sono")
+if horas_sono >= 8:
+    st.success("🟢 Sono ideal (8h ou mais)")
+elif 6 <= horas_sono < 8:
+    st.warning("🟡 Sono moderado (6h a 7h59)")
 else:
-    st.info("Nenhum consumo registrado ainda.")
+    st.error("🔴 Sono insuficiente (menos de 6h)")
+
+# -----------------------------
+# Gráficos
+# -----------------------------
+if not st.session_state.dados.empty:
+    st.subheader("📊 Gráficos")
+
+    fig1, ax1 = plt.subplots()
+    st.session_state.dados.groupby("Data")["Cafeina_mg"].sum().plot(kind="bar", ax=ax1)
+    ax1.set_title("Consumo diário de cafeína")
+    ax1.set_ylabel("Cafeína (mg)")
+    st.pyplot(fig1)
+
+    fig2, ax2 = plt.subplots()
+    st.session_state.dados.groupby("Data")["Horas_de_Sono"].mean().plot(kind="line", marker="o", ax=ax2)
+    ax2.set_title("Média de horas de sono por dia")
+    ax2.set_ylabel("Horas de sono")
+    st.pyplot(fig2)
+
+# -----------------------------
+# Exportação
+# -----------------------------
+st.subheader("📥 Exportar Dados")
+csv = st.session_state.dados.to_csv(index=False).encode("utf-8")
+st.download_button("Baixar CSV", csv, "dados_cafeina_sono.csv", "text/csv")
