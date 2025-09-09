@@ -18,7 +18,7 @@ st.title("☕ Monitor de Cafeína & Sono 😴")
 # -----------------------------
 st.subheader("Registro de Consumo")
 
-id_usuario = st.text_input("Digite seu ID (pode ser nome ou número)")
+id_usuario = st.text_input("Digite seu nome: ")
 bebida = st.selectbox("Selecione a bebida:", ["Café", "Chá", "Refrigerante", "Energético", "Outros"])
 cafeina = st.number_input("Quantidade estimada de cafeína (mg):", min_value=0, max_value=500, step=10)
 horas_sono = st.number_input("Quantas horas você dormiu na última noite?", min_value=0.0, max_value=24.0, step=0.5)
